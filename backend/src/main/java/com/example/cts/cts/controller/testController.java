@@ -10,6 +10,6 @@ public class testController {
 
     @GetMapping("/test")
     public String testEndpoint() {
-        return "Test endpoint is working!";
+        return "Test endpoint is working!!";
     }
 }
