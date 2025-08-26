@@ -11,6 +11,17 @@ const authenticateToken = (req, res, next) => {
         req.user = user;
         next();
     });
+    // Add this check after jwt.verify
+    jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
+        if (err) return res.status(403).json({ message: 'Invalid token' });
+        
+        // Verify user still exists in database
+        const user = await findEmployeeById(decoded.id);
+        if (!user) return res.status(403).json({ message: 'User no longer exists' });
+        
+        req.user = { id: user.id, role: user.role };
+        next();
+    });
 };
 
 module.exports = authenticateToken;

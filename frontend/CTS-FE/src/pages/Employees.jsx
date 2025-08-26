@@ -1,62 +1,141 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchEmployees, createEmployee, editEmployee, removeEmployee } from '../redux/employeeSlice';
+import { getEmployees, createEmployee as createEmployeeAPI, updateEmployee, deleteEmployee } from '../api/employees';
+import Button from '../components/ui/Button';
+import Card from '../components/layout/Card';
+import Modal from '../components/ui/Modal';
+import EmployeeForm from '../components/EmployeeForm';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 const Employees = () => {
-    const dispatch = useDispatch();
-    const { list, loading, error } = useSelector((state) => state.employees);
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState(null);
+  const dispatch = useDispatch();
 
-    const [name, setName] = useState('');
-    const [role, setRole] = useState('');
-    const [editingId, setEditingId] = useState(null);
+  useEffect(() => {
+    fetchEmployeesList();
+  }, []);
 
-    useEffect(() => {
-        dispatch(fetchEmployees());
-    }, [dispatch]);
+  const fetchEmployeesList = async () => {
+    setLoading(true);
+    try {
+      const data = await getEmployees();
+      setEmployees(data.employees || []);
+    } catch (err) {
+      setError('Failed to fetch employees');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const handleAddOrEdit = () => {
-        if (editingId) {
-            dispatch(editEmployee({ id: editingId, employee: { name, role } }));
-            setEditingId(null);
-        } else {
-            dispatch(createEmployee({ name, role }));
-        }
-        setName('');
-        setRole('');
-    };
+  const handleSubmit = async (formData) => {
+    setLoading(true);
+    try {
+      if (editingEmployee) {
+        await updateEmployee(editingEmployee.id, formData);
+        setEditingEmployee(null);
+      } else {
+        await createEmployeeAPI(formData);
+      }
+      setIsModalOpen(false);
+      fetchEmployeesList();
+    } catch (err) {
+      setError('Failed to save employee');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const handleEdit = (emp) => {
-        setEditingId(emp.id);
-        setName(emp.name);
-        setRole(emp.role);
-    };
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this employee?')) return;
+    
+    setLoading(true);
+    try {
+      await deleteEmployee(id);
+      fetchEmployeesList();
+    } catch (err) {
+      setError('Failed to delete employee');
+      setLoading(false);
+    }
+  };
 
-    const handleDelete = (id) => {
-        dispatch(removeEmployee(id));
-    };
+  const handleEdit = (emp) => {
+    setEditingEmployee(emp);
+    setIsModalOpen(true);
+  };
 
-    if (loading) return <p>Loading...</p>;
-    if (error) return <p>Error: {error}</p>;
+  const handleAdd = () => {
+    setEditingEmployee(null);
+    setIsModalOpen(true);
+  };
 
+  if (loading && employees.length === 0) {
     return (
-        <div style={{ maxWidth: '600px', margin: '20px auto' }}>
-            <h2>Employees</h2>
-            <div>
-                <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
-                <input placeholder="Role" value={role} onChange={(e) => setRole(e.target.value)} />
-                <button onClick={handleAddOrEdit}>{editingId ? 'Update' : 'Add'}</button>
-            </div>
-            <ul>
-                {list.map(emp => (
-                    <li key={emp.id}>
-                        {emp.name} - {emp.role}
-                        <button onClick={() => handleEdit(emp)}>Edit</button>
-                        <button onClick={() => handleDelete(emp.id)}>Delete</button>
-                    </li>
-                ))}
-            </ul>
-        </div>
+      <div className="flex justify-center items-center h-64">
+        <LoadingSpinner size="large" />
+      </div>
     );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">Employees</h2>
+        <Button onClick={handleAdd}>Add Employee</Button>
+      </div>
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+
+      <Card>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Weekly Wage</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {employees.map((emp) => (
+                <tr key={emp.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{emp.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{emp.role}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${emp.weekly_wage}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                    <Button size="small" onClick={() => handleEdit(emp)}>Edit</Button>
+                    <Button variant="danger" size="small" onClick={() => handleDelete(emp.id)}>Delete</Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingEmployee ? 'Edit Employee' : 'Add Employee'}
+      >
+        <EmployeeForm
+          onSubmit={handleSubmit}
+          initialData={editingEmployee || { name: '', role: '', weekly_wage: '' }}
+          loading={loading}
+          submitText={editingEmployee ? 'Update Employee' : 'Add Employee'}
+        />
+      </Modal>
+    </div>
+  );
 };
 
 export default Employees;
