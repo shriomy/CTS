@@ -25,7 +25,8 @@ const calculateSalary = async (req, res) => {
         let totalHours = 0;
         attendance.forEach(a => totalHours += parseFloat(a.hours_worked));
         const dailyHours = 8;
-        const grossSalary = (totalHours / (attendance.length * dailyHours)) * weeklyWage;
+        const daysInWeek = 5; // Assuming 5-day work week
+        const grossSalary = (totalHours / (daysInWeek * dailyHours)) * weeklyWage;
 
         // 4. Get allowances (bonus, incentives) for employee this week
         const allowanceResult = await pool.query(
